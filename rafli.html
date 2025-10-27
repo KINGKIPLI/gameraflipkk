@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pixel RPG Quiz — Pasal HAKI 4·5·6 (30 soal)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#081226;--panel:#0f2a3f;--accent:#ffd24d;--muted:#9fb3d6}
+    *{box-sizing:border-box;font-family:'Press Start 2P',monospace}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#061226 0%, #071a2d 100%);color:#cfe7ff}
+    .wrap{max-width:980px;margin:18px auto;padding:14px}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    h1{font-size:16px;color:var(--accent);margin:0}
+    .info{font-size:10px;color:var(--muted)}
+
+    /* game area */
+    .game-frame{background:linear-gradient(180deg,#0b2030,#061226);padding:12px;border-radius:10px;border:6px solid #0b2a4a}
+    #gameCanvas{background:#89c17c;display:block;margin:0 auto;border-radius:6px;border:2px solid #0b2a4a}
+
+    /* HUD */
+    .hud{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+    .hud .left,.hud .right{font-size:11px;color:var(--muted)}
+    .controls{font-size:10px;color:var(--muted);margin-top:8px}
+
+    /* dialog / modal */
+    .modalBackdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:flex;align-items:center;justify-content:center;z-index:40}
+    .modal{width:640px;max-width:92%;background:#071730;border:4px solid #0b2a4a;padding:14px;border-radius:8px}
+    .modal h2{margin:0 0 8px;color:var(--accent);font-size:12px}
+    .modal p{margin:6px 0;color:#cfe7ff;font-size:10px}
+    .answers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .btn{padding:8px;border-radius:6px;border:0;background:var(--accent);color:#081022;cursor:pointer;display:inline-block;font-size:10px}
+    .btnAlt{background:#0b557f;color:#fff}
+    .floatText{position:absolute;font-size:10px;padding:6px 8px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.06);border-radius:6px;color:var(--accent)}
+
+    @media (max-width:720px){#gameCanvas{width:100%} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Pixel QUIZ RAFLI RPG PKK HAKI PASAL 4, 5, DAN 6</h1>
+      <div class="info">Kontrol: ← → ↑ ↓ untuk jalan, Spasi untuk interaksi</div>
+    </div>
+
+    <div class="game-frame">
+      <canvas id="gameCanvas" width="800" height="440"></canvas>
+
+      <div class="hud">
+        <div class="left">Pemain: <span id="playerName">Pemain</span></div>
+        <div class="right">Skor: <span id="score">0</span> | Interaksi: <span id="interactHint">Dekat NPC tekan Spasi</span></div>
+      </div>
+
+      <div class="controls">Map sederhana • NPC: Pasal 4, Pasal 5, Pasal 6 • Dekati NPC lalu tekan Spasi</div>
+    </div>
+  </div>
+
+  <!-- Modal quiz -->
+  <div id="modal" style="display:none"></div>
+
+  <script>
+    // ===== GAME SETUP =====
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const TILE = 32; // tile size in px
+    const MAP_W = 25, MAP_H = 13; // grid size
+
+    // generate simple map (0=grass,1=tree)
+    const map = [];
+    for(let y=0;y<MAP_H;y++){
+      const row=[];
+      for(let x=0;x<MAP_W;x++){
+        if(y>9 && Math.random()<0.03) row.push(1); else row.push(0);
+      }
+      map.push(row);
+    }
+
+    // NPCs (Pasal 4,5,6)
+    const npcs = [
+      {id:'Pasal 4', x:6, y:9},
+      {id:'Pasal 5', x:13, y:9},
+      {id:'Pasal 6', x:20, y:9}
+    ];
+
+    // Player state
+    const player = {x:2, y:9, px:2*TILE, py:9*TILE, w:24, h:28, speed:2};
+    let keys = {};
+    let score = 0;
+
+    document.getElementById('score').textContent = score;
+
+    // ====== QUESTIONS: 10 per pasal ======
+    const QUESTIONS = {
+      'Pasal 4': [
+        {q:'Apa yang diatur dalam Pasal 4 Hak Cipta?', a:['Objek yang dilindungi hak cipta','Sanksi pidana','Prosedur pendaftaran','Tarif royalti'], correct:0},
+        {q:'Ciptaan yang dilindungi biasanya meliputi?', a:['Buku, musik, seni visual','Nama merek dagang','Tanah dan bangunan','Nomor identitas'], correct:0},
+        {q:'Hak cipta mulai berlaku sejak?', a:['Karya tercipta dan dinyatakan nyata','Setelah mendaftar','Setelah dijual','Setelah 1 tahun'], correct:0},
+        {q:'Contoh karya yang dilindungi hak cipta adalah?', a:['Lagu dan puisi','Garis batas tanah','Nomor paten','Merk dagang'], correct:0},
+        {q:'Pasal 4 membahas bidang perlindungan terhadap?', a:['Karya seni dan sastra','Tanah','Perbankan','Perdagangan'], correct:0},
+        {q:'Salah satu tujuan perlindungan hak cipta adalah untuk?', a:['Melindungi pencipta kreatif','Mengatur harga barang','Mengatur lalu lintas','Memungut pajak'], correct:0},
+        {q:'Hak moral pencipta biasanya mencakup?', a:['Hak disebut sebagai pencipta','Hak pajak','Hak investasi','Hak pindah negara'], correct:0},
+        {q:'Yang bukan objek hak cipta: ', a:['Nama dagang (merek)','Novel','Lagu','Lukisan'], correct:0},
+        {q:'Hak ekonomi pemegang hak cipta antara lain?', a:['Reproduksi dan distribusi karya','Hak merek dagang','Hak atas tanah','Hak paspor'], correct:0},
+        {q:'Perlindungan hak cipta tidak melindungi?', a:['Ide kosong tanpa bentuk ekspresi','Bentuk ekspresi karya','Rekaman suara','Film yang sudah dibuat'], correct:0}
+      ],
+
+      'Pasal 5': [
+        {q:'Pasal 5 sering memuat hal mengenai?', a:['Pengecualian dan batasan penggunaan','Prosedur administrasi','Larangan perdagangan','Tata cara persidangan'], correct:0},
+        {q:'Penggunaan terbatas untuk pendidikan biasanya termasuk?', a:['Pengecualian penggunaan (fair use)','Pelanggaran serius','Pembajakan','Pendaftaran wajib'], correct:0},
+        {q:'Contoh penggunaan wajar adalah?', a:['Mengutip sebagian untuk pendidikan','Menggandakan dan menjual massal','Mengklaim sebagai hasil sendiri','Menghapus nama pencipta'], correct:0},
+        {q:'Pengecualian sering diberikan untuk tujuan?', a:['Pembelajaran dan penelitian','Kejahatan','Eksploitasi komersial besar','Perdagangan internasional'], correct:0},
+        {q:'Penggunaan kutipan yang wajar mensyaratkan?', a:['Kutipan terbatas dan tujuan non-komersial','Menyalin seluruh karya','Menghapus nama pencipta','Menjual ulang'], correct:0},
+        {q:'Hak moral dapat mencakup?', a:['Menentang perubahan yang merugikan nama baik pencipta','Hak menggandakan untuk semua orang','Hak menuntut negara','Hak mengubah hukum'], correct:0},
+        {q:'Pengecualian tidak berarti?', a:['Boleh diperjualbelikan tanpa batas','Boleh dipakai untuk pendidikan dalam batas tertentu','Boleh dikutip dengan sumber','Boleh dikembangkan untuk penelitian'], correct:0},
+        {q:'Pasal pengecualian bertujuan agar?', a:['Keseimbangan antara publik dan pemegang hak','Mencabut hak pencipta','Membebaskan semua penggunaan','Menghilangkan royalti'], correct:0},
+        {q:'Penggunaan untuk ulasan dan kritik termasuk?', a:['Kemungkinan pengecualian jika terbatas','Selalu dilarang','Harus dibayar setiap kali','Hanya jika untuk komersial'], correct:0},
+        {q:'Penggunaan cuplikan berita untuk pendidikan termasuk?', a:['Masuk pengecualian bila proporsional','Selalu pelanggaran','Hanya untuk penjualan','Tidak pernah diperbolehkan'], correct:0}
+      ],
+
+      'Pasal 6': [
+        {q:'Pasal 6 umumnya berkaitan dengan …', a:['Durasi atau hak terkait pemegang hak','Aturan impor','Standar kualitas','Pajak royalti'], correct:0},
+        {q:'Lama perlindungan hak cipta biasanya dihitung sejak?', a:['Tanggal penciptaan atau kematian pencipta (tergantung aturan)','Tanggal pendaftaran','Tanggal penjualan pertama','Tanggal penerimaan royalti'], correct:0},
+        {q:'Jika ciptaan dibuat dalam hubungan kerja, hak cipta biasanya dimiliki oleh?', a:['Pemberi kerja jika diatur dalam perjanjian','Selalu pencipta pribadi tanpa pengecualian','Negara','Publik'], correct:0},
+        {q:'Ciptaan atas pesanan biasanya hak cipta dimiliki oleh?', a:['Bergantung perjanjian antara pihak','Otomatis milik publik','Selalu pencipta','Selalu pemerintah'], correct:0},
+        {q:'Perpanjangan masa perlindungan hak cipta bisa terjadi jika?', a:['Ditetapkan oleh regulasi khusus','Setiap pembuat bisa memperpanjang sendiri','Otomatis seumur hidup','Tidak mungkin diperpanjang'], correct:0},
+        {q:'Setelah masa perlindungan berakhir, karya menjadi?', a:['Domain publik','Masih dilindungi penuh','Hanya boleh dipakai oleh pemerintah','Hanya boleh dipakai di luar negeri'], correct:0},
+        {q:'Durasi perlindungan berbeda untuk jenis karya? ', a:['Bisa berbeda tergantung jenis dan aturan','Sama untuk semua tanpa pengecualian','Hanya 1 tahun untuk semua','Selalu 100 tahun'], correct:0},
+        {q:'Ketentuan mengenai kepemilikan dapat diatur melalui?', a:['Perjanjian kerja atau kontrak tertulis','Hanya undang-undang, tidak bisa kontrak','Hanya ke pengadilan','Otomatis lewat lisan saja'], correct:0},
+        {q:'Jika hak cipta dialihkan, hal ini harus?', a:['Ditetapkan dalam perjanjian tertulis untuk kepastian','Tidak perlu bukti tertulis','Cukup lisan','Hanya berlaku setelah 10 tahun'], correct:0},
+        {q:'Salah satu tujuan mengatur durasi hak cipta adalah?', a:['Menyeimbangkan kepentingan publik dan pencipta','Menghilangkan karya lama','Memblokir akses pendidikan','Meningkatkan pajak karya'], correct:0}
+      ]
+    };
+
+    // ===== drawing helpers =====
+    function drawTile(x,y,type){
+      const px = x*TILE, py = y*TILE;
+      if(type===0){
+        ctx.fillStyle = '#7cc576'; ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle = 'rgba(0,0,0,0.04)'; ctx.fillRect(px+4,py+12,2,6);
+      } else {
+        ctx.fillStyle='#5a8d4a'; ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle='#3b5b2f'; ctx.fillRect(px+6,py+6,20,18);
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.strokeRect(px,py,TILE,TILE);
+    }
+
+    function drawPlayer(){
+      const spriteX = player.px + (TILE-player.w)/2;
+      const spriteY = player.py + (TILE-player.h);
+      ctx.fillStyle = '#ffddaa'; ctx.fillRect(spriteX, spriteY, player.w, player.h);
+      ctx.fillStyle = '#2b2b2b'; ctx.fillRect(spriteX+4,spriteY-6,player.w-8,6);
+      ctx.fillStyle = '#0b5590'; ctx.fillRect(spriteX+2,spriteY+12,player.w-4,10);
+      ctx.fillStyle='#000'; ctx.fillRect(spriteX+6,spriteY+2,2,2); ctx.fillRect(spriteX+12,spriteY+2,2,2);
+    }
+
+    function drawNPC(n){
+      const px = n.x*TILE + 4, py = n.y*TILE + 4;
+      ctx.fillStyle = '#fff4c6'; ctx.fillRect(px,py,24,28);
+      ctx.fillStyle='#7a3b3b'; ctx.fillRect(px+4,py+14,16,10);
+      ctx.fillStyle='#222'; ctx.fillRect(px+6,py+4,2,2); ctx.fillRect(px+14,py+4,2,2);
+      ctx.fillStyle='#071730'; ctx.font='10px \"Press Start 2P\"'; ctx.fillText(n.id, px-6, py-6);
+    }
+
+    // ===== game loop =====
+    function update(){
+      if(keys['ArrowLeft']){ player.px -= player.speed; }
+      if(keys['ArrowRight']){ player.px += player.speed; }
+      if(keys['ArrowUp']){ player.py -= player.speed; }
+      if(keys['ArrowDown']){ player.py += player.speed; }
+
+      // keep inside bounds
+      player.px = Math.max(0, Math.min(player.px, (MAP_W-1)*TILE));
+      player.py = Math.max(0, Math.min(player.py, (MAP_H-1)*TILE));
+      player.x = Math.round(player.px / TILE);
+      player.y = Math.round(player.py / TILE);
+
+      // simple collision: if tile is tree (1), push back
+      if(map[player.y] && map[player.y][player.x]===1){
+        if(keys['ArrowLeft']) player.px += player.speed*2;
+        if(keys['ArrowRight']) player.px -= player.speed*2;
+        if(keys['ArrowUp']) player.py += player.speed*2;
+        if(keys['ArrowDown']) player.py -= player.speed*2;
+      }
+    }
+
+    function render(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      for(let y=0;y<MAP_H;y++) for(let x=0;x<MAP_W;x++) drawTile(x,y,map[y][x]);
+      npcs.forEach(n=> drawNPC(n));
+      drawPlayer();
+    }
+
+    function loop(){ update(); render(); requestAnimationFrame(loop); }
+
+    // ===== interaction =====
+    function findNearbyNPC(){
+      for(const n of npcs){
+        const dx = Math.abs(n.x - player.x);
+        const dy = Math.abs(n.y - player.y);
+        if(dx<=1 && dy<=1) return n;
+      }
+      return null;
+    }
+
+    document.addEventListener('keydown', (e)=>{
+      keys[e.key]=true;
+      if(e.code==='Space'){
+        const n = findNearbyNPC();
+        if(n) openQuizFor(n);
+      }
+    });
+    document.addEventListener('keyup', (e)=>{ keys[e.key]=false; });
+
+    // ===== quiz modal =====
+    const modalRoot = document.getElementById('modal');
+    function openQuizFor(npc){
+      const qarr = QUESTIONS[npc.id] || [];
+      if(!qarr.length) return alert('Belum ada soal untuk '+npc.id);
+      const q = qarr[Math.floor(Math.random()*qarr.length)];
+
+      modalRoot.innerHTML = '';
+      const backdrop = document.createElement('div'); backdrop.className='modalBackdrop';
+      const box = document.createElement('div'); box.className='modal';
+      const title = document.createElement('h2'); title.textContent = npc.id + ' — Quiz';
+      const p = document.createElement('p'); p.textContent = q.q;
+      box.appendChild(title); box.appendChild(p);
+
+      const answers = document.createElement('div'); answers.className='answers';
+      q.a.forEach((ans,i)=>{
+        const b = document.createElement('button'); b.className='btn'; b.textContent = ans;
+        b.onclick = ()=>{ handleAnswer(i===q.correct, npc); backdrop.remove(); modalRoot.style.display='none'; };
+        answers.appendChild(b);
+      });
+
+      const footer = document.createElement('div'); footer.style.marginTop='8px';
+      const cancel = document.createElement('button'); cancel.className='btnAlt'; cancel.textContent='Batal';
+      cancel.onclick = ()=>{ backdrop.remove(); modalRoot.style.display='none'; };
+      footer.appendChild(cancel);
+
+      box.appendChild(answers); box.appendChild(footer);
+      backdrop.appendChild(box); modalRoot.appendChild(backdrop); modalRoot.style.display='block';
+    }
+
+    function handleAnswer(isCorrect,npc){
+      if(isCorrect){ score += 10; showFloatingText('Benar! +10', player.px+20, player.py-10, '#9fffa0'); }
+      else { showFloatingText('Salah!', player.px+20, player.py-10, '#ff9b9b'); }
+      document.getElementById('score').textContent = score;
+    }
+
+    function showFloatingText(text,x,y,color){
+      const div = document.createElement('div'); div.className='floatText';
+      // position relative to canvas on page
+      const rect = canvas.getBoundingClientRect();
+      div.style.left = (rect.left + x) + 'px';
+      div.style.top = (rect.top + y) + 'px';
+      div.style.color = color; div.textContent = text;
+      document.body.appendChild(div);
+      setTimeout(()=>{ div.style.transition='transform 800ms ease-out, opacity 800ms'; div.style.transform='translateY(-40px)'; div.style.opacity='0'; },50);
+      setTimeout(()=>div.remove(),900);
+    }
+
+    // ===== initial player name prompt =====
+    const pname = prompt('Masukkan nama pemain (opsional):','Pemain') || 'Pemain';
+    document.getElementById('playerName').textContent = pname;
+
+    // start loop
+    loop();
+  </script>
+</body>
+</html>
